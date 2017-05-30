@@ -23,6 +23,10 @@ public class Main_Unit : MonoBehaviour
         GetComponent<Button>().onClick.AddListener(OnClick);
     }
 
+    /// <summary>
+    /// ユニットを対象のマスに移動させます
+    /// </summary>
+    /// <param name="cell">Cell.</param>
     public void MoveTo(Main_Cell cell)
     {
         GetComponent<Button>().enabled = false;
@@ -38,6 +42,7 @@ public class Main_Unit : MonoBehaviour
             {
                 x = routeCells[routeCells.Length - 1].X;
                 y = routeCells[routeCells.Length - 1].Y;
+                isFocused = false;
                 GetComponent<Button>().enabled = true;
             });
     }

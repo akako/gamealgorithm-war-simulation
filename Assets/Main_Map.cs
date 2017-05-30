@@ -17,6 +17,10 @@ public class Main_Map : MonoBehaviour
 
     List<Main_Cell> cells = new List<Main_Cell>();
 
+    /// <summary>
+    /// 選択中のユニットを返します
+    /// </summary>
+    /// <value>The active unit.</value>
     public Main_Unit ActiveUnit
     {
         get { return unitContainer.GetComponentsInChildren<Main_Unit>().First(); }
@@ -130,6 +134,12 @@ public class Main_Map : MonoBehaviour
         return routeCells.ToArray();
     }
 
+    /// <summary>
+    /// 指定座標にユニットを配置します
+    /// </summary>
+    /// <param name="x">The x coordinate.</param>
+    /// <param name="y">The y coordinate.</param>
+    /// <param name="unitPrefab">Unit prefab.</param>
     public void PutUnit(int x, int y, Main_Unit unitPrefab)
     {
         var unit = Instantiate(unitPrefab);

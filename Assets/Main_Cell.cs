@@ -16,6 +16,10 @@ public class Main_Cell : MonoBehaviour
     int x;
     int y;
 
+    /// <summary>
+    /// 移動可能なマスかどうか
+    /// </summary>
+    /// <value><c>true</c> if this instance is movable; otherwise, <c>false</c>.</value>
     public bool IsMovable
     {
         set { highlight.gameObject.SetActive(value); }
@@ -42,6 +46,11 @@ public class Main_Cell : MonoBehaviour
         GetComponent<Button>().onClick.AddListener(OnClick);
     }
 
+    /// <summary>
+    /// 座標をセットします
+    /// </summary>
+    /// <param name="x">The x coordinate.</param>
+    /// <param name="y">The y coordinate.</param>
     public void SetCoordinate(int x, int y)
     {
         this.x = x;
