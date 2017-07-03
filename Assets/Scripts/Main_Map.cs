@@ -1,8 +1,10 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 using System.Linq;
-using System;
+using UnityEngine;
+using UnityEngine.UI;
+using DG.Tweening;
 
 public class Main_Map : MonoBehaviour
 {
@@ -21,9 +23,9 @@ public class Main_Map : MonoBehaviour
     /// 選択中のユニットを返します
     /// </summary>
     /// <value>The active unit.</value>
-    public Main_Unit ActiveUnit
+    public Main_Unit FocusingUnit
     {
-        get { return unitContainer.GetComponentsInChildren<Main_Unit>().First(); }
+        get { return unitContainer.GetComponentsInChildren<Main_Unit>().First(x => x.IsFocusing); }
     }
 
     void Start()
@@ -80,7 +82,7 @@ public class Main_Map : MonoBehaviour
     /// <param name="moveAmount">Move amount.</param>
     public void HighlightMovableCells(int x, int y, int moveAmount)
     {
-        ResetMovableCells();
+        ClearHighlight();
         var startCell = cells.First(c => c.X == x && c.Y == y);
         foreach (var info in GetRemainingMoveAmountInfos(startCell, moveAmount))
         {
@@ -89,11 +91,33 @@ public class Main_Map : MonoBehaviour
     }
 
     /// <summary>
-    /// 移動可能なマスのハイライトを消します
+    /// 攻撃可能なマスをハイライトします
     /// </summary>
-    public void ResetMovableCells()
+    /// <param name="x">The x coordinate.</param>
+    /// <param name="y">The y coordinate.</param>
+    /// <param name="moveAmount">Move amount.</param>
+    public bool HighlightAttackableCells(int x, int y, int attackRangeMin, int attackRangeMax)
     {
-        foreach (var cell in cells.Where(c => c.IsMovable))
+        ClearHighlight();
+        var startCell = cells.First(c => c.X == x && c.Y == y);
+        var targetInfos = GetRemainingAccountRangeInfos(startCell, attackRangeMin, attackRangeMax).Where(i =>
+            {
+                var cell = cells.First(c => i.coordinate.x == c.X && i.coordinate.y == c.Y);
+                return null != cell.Unit && cell.Unit.team != FocusingUnit.team;
+            });
+        foreach (var info in targetInfos)
+        {
+            cells.First(c => c.X == info.coordinate.x && c.Y == info.coordinate.y).IsAttackable = true;
+        }
+        return targetInfos.Count() > 0;
+    }
+
+    /// <summary>
+    /// マスのハイライトを消します
+    /// </summary>
+    public void ClearHighlight()
+    {
+        foreach (var cell in cells)
         {
             cell.IsMovable = false;
         }
@@ -115,7 +139,6 @@ public class Main_Map : MonoBehaviour
             throw new ArgumentException(string.Format("endCell(x:{0}, y:{1}) is not movable.", endCell.X, endCell.Y));
         }
 
-        var endCellMoveAmountInfo = infos.First(info => info.coordinate.x == endCell.X && info.coordinate.y == endCell.Y);
         var routeCells = new List<Main_Cell>();
         routeCells.Add(endCell);
         while (true)
@@ -140,9 +163,21 @@ public class Main_Map : MonoBehaviour
     /// <param name="x">The x coordinate.</param>
     /// <param name="y">The y coordinate.</param>
     /// <param name="unitPrefab">Unit prefab.</param>
-    public void PutUnit(int x, int y, Main_Unit unitPrefab)
+    public void PutUnit(int x, int y, Main_Unit unitPrefab, Main_Unit.Teams team)
     {
         var unit = Instantiate(unitPrefab);
+        unit.team = team;
+        switch (unit.team)
+        {
+            case Main_Unit.Teams.Enemy:
+                // 敵ユニットはちょっと色を変えて反転
+                var image = unit.GetComponent<Image>();
+                image.color = new Color(1f, 0.7f, 0.7f);
+                var scale = image.transform.localScale;
+                scale.x *= -1f;
+                image.transform.localScale = scale;
+                break;
+        }
         unit.gameObject.SetActive(true);
         unit.transform.SetParent(unitContainer);
         unit.transform.position = cells.First(c => c.X == x && c.Y == y).transform.position;
@@ -151,18 +186,59 @@ public class Main_Map : MonoBehaviour
     }
 
     /// <summary>
+    /// ユニットを対象のマスに移動させます
+    /// </summary>
+    /// <param name="cell">Cell.</param>
+    public void MoveTo(Main_Unit unit, Main_Cell cell)
+    {
+        Debug.Log("MoveTo");
+        Debug.Log(unit);
+        unit.GetComponent<Button>().enabled = false;
+        ClearHighlight();
+        var routeCells = CalculateRouteCells(unit.x, unit.y, unit.moveAmount, cell);
+        var sequence = DOTween.Sequence();
+        for (var i = 1; i < routeCells.Length; i++)
+        {
+            var routeCell = routeCells[i];
+            sequence.Append(unit.transform.DOMove(routeCell.transform.position, 0.1f).SetEase(Ease.Linear));
+        }
+        sequence.OnComplete(() =>
+            {
+                unit.x = routeCells[routeCells.Length - 1].X;
+                unit.y = routeCells[routeCells.Length - 1].Y;
+                // 攻撃可能範囲のチェック
+                var isAttackable = HighlightAttackableCells(unit.x, unit.y, unit.attackRangeMin, unit.attackRangeMax);
+                if (!isAttackable)
+                {
+                    unit.GetComponent<Button>().enabled = true;
+                    unit.IsFocusing = false;
+                }
+            });
+    }
+
+    public void AttackTo(Main_Unit fromUnit, Main_Unit toUnit)
+    {
+        
+    }
+
+    public Main_Unit GetUnit(int x, int y)
+    {
+        return unitContainer.GetComponentsInChildren<Main_Unit>().FirstOrDefault(u => u.x == x && u.y == y);
+    }
+
+    /// <summary>
     /// 移動力を元に移動可能範囲の計算を行います
     /// </summary>
     /// <returns>The remaining move amount infos.</returns>
     /// <param name="startCell">Start cell.</param>
     /// <param name="moveAmount">Move amount.</param>
-    MoveAmountInfo[] GetRemainingMoveAmountInfos(Main_Cell startCell, int moveAmount)
+    CoordinateAmountInfo[] GetRemainingMoveAmountInfos(Main_Cell startCell, int moveAmount)
     {
-        var infos = new List<MoveAmountInfo>();
-        infos.Add(new MoveAmountInfo(startCell.X, startCell.Y, moveAmount));
+        var infos = new List<CoordinateAmountInfo>();
+        infos.Add(new CoordinateAmountInfo(startCell.X, startCell.Y, moveAmount));
         for (var i = moveAmount; i >= 0; i--)
         {
-            var appendInfos = new List<MoveAmountInfo>();
+            var appendInfos = new List<CoordinateAmountInfo>();
             foreach (var calcTargetInfo in infos.Where(info => info.amount == i))
             {
                 // 四方のマスの座標配列を作成
@@ -186,7 +262,7 @@ public class Main_Map : MonoBehaviour
                         continue;
                     }
                     var remainingMoveAmount = i - targetCell.Cost;
-                    appendInfos.Add(new MoveAmountInfo(aroundCellCoordinate.x, aroundCellCoordinate.y, remainingMoveAmount));
+                    appendInfos.Add(new CoordinateAmountInfo(aroundCellCoordinate.x, aroundCellCoordinate.y, remainingMoveAmount));
                 }
             }
             infos.AddRange(appendInfos);
@@ -196,14 +272,59 @@ public class Main_Map : MonoBehaviour
     }
 
     /// <summary>
-    /// 残移動力情報クラス
+    /// 攻撃可能範囲の計算を行います
     /// </summary>
-    class MoveAmountInfo
+    /// <returns>The remaining move amount infos.</returns>
+    /// <param name="startCell">Start cell.</param>
+    /// <param name="moveAmount">Move amount.</param>
+    CoordinateAmountInfo[] GetRemainingAccountRangeInfos(Main_Cell startCell, int attackRangeMin, int attackRangeMax)
+    {
+        var infos = new List<CoordinateAmountInfo>();
+        infos.Add(new CoordinateAmountInfo(startCell.X, startCell.Y, attackRangeMax));
+        for (var i = attackRangeMax; i >= 0; i--)
+        {
+            var appendInfos = new List<CoordinateAmountInfo>();
+            foreach (var calcTargetInfo in infos.Where(info => info.amount == i))
+            {
+                // 四方のマスの座標配列を作成
+                var calcTargetCoordinate = calcTargetInfo.coordinate;
+                var aroundCellCoordinates = new Coordinate[]
+                {
+                    new Coordinate(calcTargetCoordinate.x - 1, calcTargetCoordinate.y),
+                    new Coordinate(calcTargetCoordinate.x + 1, calcTargetCoordinate.y),
+                    new Coordinate(calcTargetCoordinate.x, calcTargetCoordinate.y - 1),
+                    new Coordinate(calcTargetCoordinate.x, calcTargetCoordinate.y + 1),
+                };
+                // 四方のマスの残攻撃範囲を計算
+                foreach (var aroundCellCoordinate in aroundCellCoordinates)
+                {
+                    var targetCell = cells.FirstOrDefault(c => c.X == aroundCellCoordinate.x && c.Y == aroundCellCoordinate.y);
+                    if (null == targetCell ||
+                        infos.Any(info => info.coordinate.x == aroundCellCoordinate.x && info.coordinate.y == aroundCellCoordinate.y) ||
+                        appendInfos.Any(info => info.coordinate.x == aroundCellCoordinate.x && info.coordinate.y == aroundCellCoordinate.y))
+                    {
+                        // マップに存在しない、または既に計算済みの座標はスルー
+                        continue;
+                    }
+                    var remainingMoveAmount = i - 1;
+                    appendInfos.Add(new CoordinateAmountInfo(aroundCellCoordinate.x, aroundCellCoordinate.y, remainingMoveAmount));
+                }
+            }
+            infos.AddRange(appendInfos);
+        }
+        // 攻撃範囲内のマスの情報だけを返す
+        return infos.Where(x => 0 <= x.amount && x.amount <= (attackRangeMax - attackRangeMin)).ToArray();
+    }
+
+    /// <summary>
+    /// 対象座標での残○○力情報クラス
+    /// </summary>
+    class CoordinateAmountInfo
     {
         public readonly Coordinate coordinate;
         public readonly int amount;
 
-        public MoveAmountInfo(int x, int y, int amount)
+        public CoordinateAmountInfo(int x, int y, int amount)
         {
             this.coordinate = new Coordinate(x, y);
             this.amount = amount;

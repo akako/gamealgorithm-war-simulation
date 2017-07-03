@@ -12,6 +12,10 @@ public class Main_Cell : MonoBehaviour
     Image highlight;
     [SerializeField]
     int cost;
+    [SerializeField]
+    Color movableColor;
+    [SerializeField]
+    Color attackableColor;
 
     int x;
     int y;
@@ -22,8 +26,22 @@ public class Main_Cell : MonoBehaviour
     /// <value><c>true</c> if this instance is movable; otherwise, <c>false</c>.</value>
     public bool IsMovable
     {
-        set { highlight.gameObject.SetActive(value); }
-        get { return highlight.gameObject.activeSelf; }
+        set
+        {
+            highlight.color = movableColor;
+            highlight.gameObject.SetActive(value);
+        }
+        get { return highlight.gameObject.activeSelf && highlight.color == movableColor; }
+    }
+
+    public bool IsAttackable
+    {
+        set
+        { 
+            highlight.color = attackableColor;
+            highlight.gameObject.SetActive(value);
+        }
+        get { return highlight.gameObject.activeSelf && highlight.color == attackableColor; }
     }
 
     public int Cost
@@ -39,6 +57,11 @@ public class Main_Cell : MonoBehaviour
     public int Y
     {
         get { return y; }
+    }
+
+    public Main_Unit Unit
+    {
+        get { return map.GetUnit(x, y); }
     }
 
     void Start()
@@ -61,7 +84,11 @@ public class Main_Cell : MonoBehaviour
     {
         if (IsMovable)
         {
-            map.ActiveUnit.MoveTo(this);
+            map.MoveTo(map.FocusingUnit, this);
+        }
+        else if (IsAttackable)
+        {
+            map.AttackTo(map.FocusingUnit, Unit);
         }
     }
 }
