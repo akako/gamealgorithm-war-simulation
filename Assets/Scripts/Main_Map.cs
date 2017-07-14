@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 using DG.Tweening;
 
 public class Main_Map : MonoBehaviour
@@ -74,6 +75,11 @@ public class Main_Map : MonoBehaviour
         }
     }
 
+    public Main_Cell GetCell(int x, int y)
+    {
+        return cells.First(c => c.X == x && c.Y == y);
+    }
+
     /// <summary>
     /// 移動可能なマスをハイライトします
     /// </summary>
@@ -82,7 +88,6 @@ public class Main_Map : MonoBehaviour
     /// <param name="moveAmount">Move amount.</param>
     public void HighlightMovableCells(int x, int y, int moveAmount)
     {
-        ClearHighlight();
         var startCell = cells.First(c => c.X == x && c.Y == y);
         foreach (var info in GetRemainingMoveAmountInfos(startCell, moveAmount))
         {
@@ -98,7 +103,6 @@ public class Main_Map : MonoBehaviour
     /// <param name="moveAmount">Move amount.</param>
     public bool HighlightAttackableCells(int x, int y, int attackRangeMin, int attackRangeMax)
     {
-        ClearHighlight();
         var startCell = cells.First(c => c.X == x && c.Y == y);
         var targetInfos = GetRemainingAccountRangeInfos(startCell, attackRangeMin, attackRangeMax).Where(i =>
             {
@@ -218,7 +222,12 @@ public class Main_Map : MonoBehaviour
 
     public void AttackTo(Main_Unit fromUnit, Main_Unit toUnit)
     {
-        
+        Battle_SceneController.attacker = fromUnit;
+        Battle_SceneController.defender = toUnit;
+        SceneManager.LoadScene("Battle", LoadSceneMode.Additive);
+        ClearHighlight();
+        FocusingUnit.GetComponent<Button>().enabled = true;
+        FocusingUnit.IsFocusing = false;
     }
 
     public Main_Unit GetUnit(int x, int y)

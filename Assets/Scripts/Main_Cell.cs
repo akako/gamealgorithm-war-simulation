@@ -86,9 +86,5 @@ public class Main_Cell : MonoBehaviour
         {
             map.MoveTo(map.FocusingUnit, this);
         }
-        else if (IsAttackable)
-        {
-            map.AttackTo(map.FocusingUnit, Unit);
-        }
     }
 }
