@@ -158,6 +158,10 @@ public class Main_Map : MonoBehaviour
     {
         foreach (var cell in cells)
         {
+            if (cell.IsAttackable)
+            {
+                cell.Unit.GetComponent<Button>().interactable = false;
+            }
             cell.IsMovable = false;
         }
     }
