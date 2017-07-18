@@ -16,9 +16,19 @@ public class Main_Cell : MonoBehaviour
     Color movableColor;
     [SerializeField]
     Color attackableColor;
+    /// <summary>
+    /// 地形によるダメージ軽減率
+    /// </summary>
+    [SerializeField]
+    float reduceRate;
 
     int x;
     int y;
+
+    public float ReduceRate
+    {
+        get { return reduceRate; }
+    }
 
     /// <summary>
     /// 移動可能なマスかどうか

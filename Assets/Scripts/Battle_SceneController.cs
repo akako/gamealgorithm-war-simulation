@@ -17,6 +17,7 @@ public class Battle_SceneController : MonoBehaviour
 
     IEnumerator Start()
     {
+        // 攻撃側・防衛側の画像を反映
         RefreshImages(attackerImages, attacker);
         foreach (var image in attackerImages)
         {
@@ -27,13 +28,14 @@ public class Battle_SceneController : MonoBehaviour
         RefreshImages(defenderImages, defender);
         foreach (var image in defenderImages)
         {
-            var unitImage = attacker.GetComponent<Image>(); 
+            var unitImage = defender.GetComponent<Image>(); 
             image.sprite = unitImage.sprite;
             image.color = unitImage.color; 
         }
 
         yield return new WaitForSeconds(0.5f);
 
+        // 攻撃アニメーション
         foreach (var image in attackerImages)
         {
             image.transform.DOLocalMoveX(image.transform.localPosition.x - 30f, 0.2f)
@@ -42,11 +44,13 @@ public class Battle_SceneController : MonoBehaviour
 
         yield return new WaitForSeconds(0.2f);
 
+        // 防衛側がダメージを受ける
         defender.Damage(attacker);
         RefreshImages(defenderImages, defender, true);
 
         yield return new WaitForSeconds(1f);
 
+        // 反撃可能な距離であれば、防衛側の反撃
         var distance = Mathf.Abs(attacker.x - defender.x) + Mathf.Abs(attacker.y - defender.y);
         if (defender.attackRangeMin <= distance && distance <= defender.attackRangeMax)
         {
@@ -64,6 +68,7 @@ public class Battle_SceneController : MonoBehaviour
 
         yield return new WaitForSeconds(1f);
 
+        // ライフが0になるとユニット消滅
         if (attacker.Life <= 0)
         {
             attacker.DestroyWithAnimate();

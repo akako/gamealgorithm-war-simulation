@@ -19,6 +19,7 @@ public class Main_Map : MonoBehaviour
     Transform unitContainer;
 
     List<Main_Cell> cells = new List<Main_Cell>();
+    Main_Unit.Teams currentTeam;
 
     /// <summary>
     /// 選択中のユニットを返します
@@ -26,7 +27,7 @@ public class Main_Map : MonoBehaviour
     /// <value>The active unit.</value>
     public Main_Unit FocusingUnit
     {
-        get { return unitContainer.GetComponentsInChildren<Main_Unit>().First(x => x.IsFocusing); }
+        get { return unitContainer.GetComponentsInChildren<Main_Unit>().FirstOrDefault(x => x.IsFocusing); }
     }
 
     void Start()
@@ -35,6 +36,28 @@ public class Main_Map : MonoBehaviour
         {
             prefab.gameObject.SetActive(false);
         }
+    }
+
+    /// <summary>
+    /// ターンを開始します
+    /// </summary>
+    /// <param name="team">Team.</param>
+    public void StartTurn(Main_Unit.Teams team)
+    {
+        currentTeam = team;
+        foreach (var unit in unitContainer.GetComponentsInChildren<Main_Unit>())
+        {
+            unit.GetComponent<Button>().interactable = team == unit.team;
+        }
+    }
+
+    /// <summary>
+    /// 次のターンに移ります
+    /// </summary>
+    public void NextTurn()
+    {
+        var nextTeam = currentTeam == Main_Unit.Teams.Player ? Main_Unit.Teams.Enemy : Main_Unit.Teams.Player;
+        StartTurn(nextTeam);
     }
 
     /// <summary>
@@ -75,6 +98,12 @@ public class Main_Map : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 任意のマスを取得します
+    /// </summary>
+    /// <returns>The cell.</returns>
+    /// <param name="x">The x coordinate.</param>
+    /// <param name="y">The y coordinate.</param>
     public Main_Cell GetCell(int x, int y)
     {
         return cells.First(c => c.X == x && c.Y == y);
@@ -91,7 +120,11 @@ public class Main_Map : MonoBehaviour
         var startCell = cells.First(c => c.X == x && c.Y == y);
         foreach (var info in GetRemainingMoveAmountInfos(startCell, moveAmount))
         {
-            cells.First(c => c.X == info.coordinate.x && c.Y == info.coordinate.y).IsMovable = true;
+            var cell = cells.First(c => c.X == info.coordinate.x && c.Y == info.coordinate.y);
+            if (null == cell.Unit)
+            {
+                cells.First(c => c.X == info.coordinate.x && c.Y == info.coordinate.y).IsMovable = true;
+            }
         }
     }
 
@@ -111,7 +144,9 @@ public class Main_Map : MonoBehaviour
             });
         foreach (var info in targetInfos)
         {
-            cells.First(c => c.X == info.coordinate.x && c.Y == info.coordinate.y).IsAttackable = true;
+            var cell = cells.First(c => c.X == info.coordinate.x && c.Y == info.coordinate.y);
+            cell.IsAttackable = true;
+            cell.Unit.GetComponent<Button>().interactable = true;
         }
         return targetInfos.Count() > 0;
     }
@@ -215,11 +250,17 @@ public class Main_Map : MonoBehaviour
                 if (!isAttackable)
                 {
                     unit.GetComponent<Button>().enabled = true;
+                    unit.GetComponent<Button>().interactable = false;
                     unit.IsFocusing = false;
                 }
             });
     }
 
+    /// <summary>
+    /// 対象ユニットに攻撃します
+    /// </summary>
+    /// <param name="fromUnit">From unit.</param>
+    /// <param name="toUnit">To unit.</param>
     public void AttackTo(Main_Unit fromUnit, Main_Unit toUnit)
     {
         Battle_SceneController.attacker = fromUnit;
@@ -227,9 +268,16 @@ public class Main_Map : MonoBehaviour
         SceneManager.LoadScene("Battle", LoadSceneMode.Additive);
         ClearHighlight();
         FocusingUnit.GetComponent<Button>().enabled = true;
+        FocusingUnit.GetComponent<Button>().interactable = false;
         FocusingUnit.IsFocusing = false;
     }
 
+    /// <summary>
+    /// 任意の座標にいるユニットを取得します
+    /// </summary>
+    /// <returns>The unit.</returns>
+    /// <param name="x">The x coordinate.</param>
+    /// <param name="y">The y coordinate.</param>
     public Main_Unit GetUnit(int x, int y)
     {
         return unitContainer.GetComponentsInChildren<Main_Unit>().FirstOrDefault(u => u.x == x && u.y == y);
