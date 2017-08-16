@@ -54,7 +54,7 @@ public class Main_Unit : MonoBehaviour
         life = lifeMax;
     }
 
-    void OnClick()
+    public void OnClick()
     {
         // 攻撃対象の選択中であれば攻撃アクション実行
         if (map.GetCell(x, y).IsAttackable)

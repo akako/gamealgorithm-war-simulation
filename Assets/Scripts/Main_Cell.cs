@@ -90,7 +90,7 @@ public class Main_Cell : MonoBehaviour
         this.y = y;
     }
 
-    void OnClick()
+    public void OnClick()
     {
         if (IsMovable)
         {

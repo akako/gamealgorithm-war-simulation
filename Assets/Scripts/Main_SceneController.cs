@@ -17,6 +17,8 @@ public class Main_SceneController : MonoBehaviour
     Main_Unit unitNeko2Prefab;
     [SerializeField]
     Button endTurnButton;
+    [SerializeField]
+    Main_AI enemyAI;
 
     IEnumerator Start()
     {
@@ -44,6 +46,9 @@ public class Main_SceneController : MonoBehaviour
         map.PutUnit(2, 1, unitMatatabiPrefab, Main_Unit.Teams.Enemy);
         map.PutUnit(1, 2, unitKobanPrefab, Main_Unit.Teams.Enemy);
         map.PutUnit(2, 2, unitNeko2Prefab, Main_Unit.Teams.Enemy);
+
+        // AI設定
+        map.SetAI(Main_Unit.Teams.Enemy, enemyAI);
 
         // ターン開始
         map.StartTurn(Main_Unit.Teams.Player);

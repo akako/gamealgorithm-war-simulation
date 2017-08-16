@@ -17,9 +17,12 @@ public class Main_Map : MonoBehaviour
     Main_Cell cellRockPrefab;
     [SerializeField]
     Transform unitContainer;
+    [SerializeField]
+    GameObject touchBlocker;
 
     List<Main_Cell> cells = new List<Main_Cell>();
     Main_Unit.Teams currentTeam;
+    Dictionary<Main_Unit.Teams, Main_AI> ais = new Dictionary<Main_Unit.Teams, Main_AI>();
 
     /// <summary>
     /// 選択中のユニットを返します
@@ -38,6 +41,11 @@ public class Main_Map : MonoBehaviour
         }
     }
 
+    public void SetAI(Main_Unit.Teams team, Main_AI ai)
+    {
+        ais[team] = ai; 
+    }
+
     /// <summary>
     /// ターンを開始します
     /// </summary>
@@ -49,6 +57,9 @@ public class Main_Map : MonoBehaviour
         {
             unit.GetComponent<Button>().interactable = team == unit.team;
         }
+
+        // AIに操作させる場合はタッチをブロックする
+        touchBlocker.SetActive(null == ais.ContainsKey(team));
     }
 
     /// <summary>
@@ -96,6 +107,16 @@ public class Main_Map : MonoBehaviour
                 cells.Add(cell);
             }
         }
+    }
+
+    public Main_Cell[] GetAttackableCells()
+    {
+        return cells.Where(x => x.IsAttackable).ToArray();
+    }
+
+    public Main_Cell[] GetMovableCells()
+    {
+        return cells.Where(x => x.IsMovable).ToArray();
     }
 
     /// <summary>
@@ -274,6 +295,11 @@ public class Main_Map : MonoBehaviour
         FocusingUnit.GetComponent<Button>().enabled = true;
         FocusingUnit.GetComponent<Button>().interactable = false;
         FocusingUnit.IsFocusing = false;
+    }
+
+    public Main_Unit[] GetMovableUnits()
+    {
+        return unitContainer.GetComponentsInChildren<Main_Unit>().ToArray();
     }
 
     /// <summary>
