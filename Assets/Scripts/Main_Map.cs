@@ -372,7 +372,6 @@ public class Main_Map : MonoBehaviour
                 if (!isAttackable)
                 {
                     unit.IsMoved = true;
-                    unit.IsFocusing = false;
                 }
             });
     }
@@ -389,7 +388,6 @@ public class Main_Map : MonoBehaviour
         SceneManager.LoadScene("Battle", LoadSceneMode.Additive);
         ClearHighlight();
         FocusingUnit.IsMoved = true;
-        FocusingUnit.IsFocusing = false;
     }
 
     /// <summary>
