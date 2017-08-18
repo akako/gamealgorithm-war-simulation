@@ -54,6 +54,10 @@ public class Main_Unit : MonoBehaviour
         { 
             isMoved = value;
             GetComponent<Button>().interactable = !isMoved;
+            if (isMoved && IsFocusing)
+            {
+                OnClick();
+            }
         }
     }
 

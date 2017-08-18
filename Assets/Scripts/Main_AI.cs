@@ -181,7 +181,7 @@ public class Main_AI : MonoBehaviour
         var cells = new List<Main_Cell>();
         foreach (var enemyUnit in map.GetEnemyUnits())
         {
-            cells.AddRange(map.GetCellsByDistance(enemyUnit.Cell, unit.attackRangeMin, unit.attackRangeMax));
+            cells.AddRange(map.GetCellsByDistance(enemyUnit.Cell, unit.attackRangeMin, unit.attackRangeMax).Where(c => c.Cost < 999));
         }
         return cells.Distinct().ToArray();
     }
