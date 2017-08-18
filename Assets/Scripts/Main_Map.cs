@@ -187,7 +187,6 @@ public class Main_Map : MonoBehaviour
     public List<CoordinateAndValue> CalcurateRouteCoordinatesAndMoveAmount(Main_Cell from, Main_Cell to)
     {
         var costs = GetMoveCostToAllCells(from);
-        Debug.Log(LitJson.JsonMapper.ToJson(costs));
         if (!costs.Any(info => info.coordinate.x == to.X && info.coordinate.y == to.Y))
         {
             throw new ArgumentException(string.Format("x:{0}, y:{1} is not movable.", to.X, to.Y));
@@ -356,9 +355,6 @@ public class Main_Map : MonoBehaviour
     /// <param name="cell">Cell.</param>
     public void MoveTo(Main_Unit unit, Main_Cell cell)
     {
-        Debug.Log("MoveTo");
-        Debug.Log(unit);
-        unit.GetComponent<Button>().enabled = false;
         ClearHighlight();
         var routeCells = CalculateRouteCells(unit.x, unit.y, unit.moveAmount, cell);
         var sequence = DOTween.Sequence();

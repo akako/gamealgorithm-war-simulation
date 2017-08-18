@@ -94,15 +94,24 @@ public class Main_Unit : MonoBehaviour
     }
 
     /// <summary>
-    /// ダメージ計算を行います
+    /// ダメージを与えます
     /// </summary>
     /// <param name="attacker">Attacker.</param>
     public void Damage(Main_Unit attacker)
     {
+        life = Mathf.Max(0, life - CalcurateDamageValue(attacker));
+    }
+
+    /// <summary>
+    /// ダメージ値を計算します
+    /// </summary>
+    /// <param name="attacker">Attacker.</param>
+    public int CalcurateDamageValue(Main_Unit attacker)
+    {
         // 三つ巴的な相性ダメージ Kuro < Shiro < Tora < Kuro ...
         var unitTypeBonus = new float[]{ 1f, 2f, 0.5f }[(((int)attacker.unitType - (int)unitType) + 3) % 3];
         var damage = Mathf.RoundToInt(attacker.AttackPower * unitTypeBonus * (1f - attacker.Cell.ReduceRate));
-        life = Mathf.Max(0, life - damage);
+        return damage;
     }
 
     public void DestroyWithAnimate()

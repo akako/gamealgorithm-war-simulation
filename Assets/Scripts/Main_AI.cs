@@ -6,7 +6,17 @@ using System.Linq;
 
 public class Main_AI : MonoBehaviour
 {
-    // TODO AIパラメータ群の実装
+    // 攻撃対象選択時のランダム性
+    [SerializeField, Range(0, 100)]
+    int randomizeAttackTarget = 50;
+
+    // 検知距離（これ以上近づいたら襲ってくる）
+    [SerializeField, Range(0, 100)]
+    int detectionDistance = 4;
+
+    // 地形効果の重視度合い
+    [SerializeField, Range(0, 100)]
+    int cellReduceRateImportance = 0;
 
     Main_Map map;
 
@@ -24,10 +34,15 @@ public class Main_AI : MonoBehaviour
     {
         yield return new WaitForSeconds(0.5f);
         // 行動可能なユニットを取得
-        var units = map.GetOwnUnits().Where(x => !x.IsMoved).OrderByDescending(x => x.Life);
-        foreach (var unit in units)
+        var ownUnits = map.GetOwnUnits().OrderByDescending(x => x.Life);
+        var enemyUnits = map.GetEnemyUnits();
+        if (ownUnits.Min(ou => enemyUnits.Min(eu => Mathf.Abs(ou.x - eu.x) + Mathf.Abs(ou.y - eu.y))) <= detectionDistance)
         {
-            yield return MoveAndAttackCoroutine(unit);
+            // 敵ユニットが指定距離内に入ったら行動開始
+            foreach (var unit in ownUnits)
+            {
+                yield return MoveAndAttackCoroutine(unit);
+            }
         }
         yield return new WaitForSeconds(0.5f);
         // 全ての操作が完了したらターン終了
@@ -59,10 +74,10 @@ public class Main_AI : MonoBehaviour
         unit.OnClick();
 
         var route = map.CalcurateRouteCoordinatesAndMoveAmount(unit.Cell, targetCell);
-        var movableCells = map.GetMovableCells();
-        if (movableCells.Length == 0)
+        var movableCells = map.GetMovableCells().ToList();
+        if (movableCells.Count == 0)
         {
-            yield return AttackIfPossibleCoroutine();
+            yield return AttackIfPossibleCoroutine(unit);
             if (!unit.IsMoved)
             {
                 // 行動不能な場合は行動終了
@@ -74,27 +89,46 @@ public class Main_AI : MonoBehaviour
         }
         else
         {
-            var movableRoute = route.Where(r => movableCells.Any(c => c.X == r.coordinate.x && c.Y == r.coordinate.y));
-            if (movableRoute.Count() > 0)
+            // 自分の居るマスも移動先の選択肢に含める
+            movableCells.Add(unit.Cell);
+            var moveTargetCell = movableCells.OrderByDescending(c =>
+                {
+                    var matchedRoute = route.FirstOrDefault(r => r.coordinate.x == c.X && r.coordinate.y == c.Y);
+                    return (null != matchedRoute ? matchedRoute.value : 0) +
+                    c.ReduceRate * cellReduceRateImportance;
+                }).First();
+
+            if (moveTargetCell != unit.Cell)
             {
-                var targetRoute = movableRoute.OrderByDescending(r => r.value).First();
-                var moveTargetCell = map.GetCell(targetRoute.coordinate.x, targetRoute.coordinate.y);
                 yield return new WaitForSeconds(0.5f);
                 moveTargetCell.OnClick();
                 // 移動完了を待つ
                 yield return WaitMoveCoroutine(unit, moveTargetCell);
             }
-            yield return AttackIfPossibleCoroutine();
+
+            yield return AttackIfPossibleCoroutine(unit);
         }
     }
 
-    IEnumerator AttackIfPossibleCoroutine()
+    IEnumerator AttackIfPossibleCoroutine(Main_Unit unit)
     {
         var attackableCells = map.GetAttackableCells();
         if (0 < attackableCells.Length)
         {
-            // 攻撃可能なマスのうち、HPが一番低いユニットが居るマスに攻撃
-            attackableCells.OrderBy(x => x.Unit.Life).First().Unit.OnClick();
+            if (Random.Range(0, 100) < randomizeAttackTarget)
+            {
+                // ランダムで対象を選ぶ
+                attackableCells[Random.Range(0, attackableCells.Length)].Unit.OnClick();
+            }
+            else
+            {
+                // 攻撃可能なマスのうち、できるだけ倒せる/大ダメージを与えられる/反撃が痛くないマスに攻撃
+                attackableCells.OrderByDescending(x =>
+                    {
+                        var damageValue = x.Unit.CalcurateDamageValue(unit);
+                        return damageValue * (x.Unit.Life <= damageValue ? 10 : 1) - unit.CalcurateDamageValue(x.Unit);
+                    }).First().Unit.OnClick();
+            }
             yield return WaitBattleCoroutine();
         }
     }
