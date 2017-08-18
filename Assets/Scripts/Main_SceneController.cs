@@ -37,21 +37,21 @@ public class Main_SceneController : MonoBehaviour
         // GridLayoutによる自動レイアウトで、マスの座標が確定するのを待つ
         yield return null;
         // ユニット配置
-        map.PutUnit(7, 7, unitNekoPrefab, Main_Unit.Teams.Player);
-        map.PutUnit(6, 7, unitMatatabiPrefab, Main_Unit.Teams.Player);
-        map.PutUnit(7, 6, unitKobanPrefab, Main_Unit.Teams.Player);
-        map.PutUnit(6, 6, unitNeko2Prefab, Main_Unit.Teams.Player);
+        map.PutUnit(7, 7, unitNekoPrefab, Main_Unit.Teams.Player1);
+        map.PutUnit(6, 7, unitMatatabiPrefab, Main_Unit.Teams.Player1);
+        map.PutUnit(7, 6, unitKobanPrefab, Main_Unit.Teams.Player1);
+        map.PutUnit(6, 6, unitNeko2Prefab, Main_Unit.Teams.Player1);
         // 敵ユニット配置
-        map.PutUnit(1, 1, unitNekoPrefab, Main_Unit.Teams.Enemy);
-        map.PutUnit(2, 1, unitMatatabiPrefab, Main_Unit.Teams.Enemy);
-        map.PutUnit(1, 2, unitKobanPrefab, Main_Unit.Teams.Enemy);
-        map.PutUnit(2, 2, unitNeko2Prefab, Main_Unit.Teams.Enemy);
+        map.PutUnit(1, 1, unitNekoPrefab, Main_Unit.Teams.Player2);
+        map.PutUnit(2, 1, unitMatatabiPrefab, Main_Unit.Teams.Player2);
+        map.PutUnit(1, 2, unitKobanPrefab, Main_Unit.Teams.Player2);
+        map.PutUnit(2, 2, unitNeko2Prefab, Main_Unit.Teams.Player2);
 
         // AI設定
-        map.SetAI(Main_Unit.Teams.Enemy, enemyAI);
+        map.SetAI(Main_Unit.Teams.Player2, enemyAI);
 
         // ターン開始
-        map.StartTurn(Main_Unit.Teams.Player);
+        map.StartTurn(Main_Unit.Teams.Player1);
     }
 
 

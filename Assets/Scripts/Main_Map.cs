@@ -43,6 +43,7 @@ public class Main_Map : MonoBehaviour
 
     public void SetAI(Main_Unit.Teams team, Main_AI ai)
     {
+        ai.Initialize(this);
         ais[team] = ai; 
     }
 
@@ -55,11 +56,19 @@ public class Main_Map : MonoBehaviour
         currentTeam = team;
         foreach (var unit in unitContainer.GetComponentsInChildren<Main_Unit>())
         {
-            unit.GetComponent<Button>().interactable = team == unit.team;
+            unit.IsMoved = team != unit.team;
         }
 
-        // AIに操作させる場合はタッチをブロックする
-        touchBlocker.SetActive(null == ais.ContainsKey(team));
+        if (ais.ContainsKey(team))
+        {
+            touchBlocker.SetActive(true);
+            var ai = ais[team];
+            ai.Run();
+        }
+        else
+        {
+            touchBlocker.SetActive(false);
+        }
     }
 
     /// <summary>
@@ -67,7 +76,7 @@ public class Main_Map : MonoBehaviour
     /// </summary>
     public void NextTurn()
     {
-        var nextTeam = currentTeam == Main_Unit.Teams.Player ? Main_Unit.Teams.Enemy : Main_Unit.Teams.Player;
+        var nextTeam = currentTeam == Main_Unit.Teams.Player1 ? Main_Unit.Teams.Player2 : Main_Unit.Teams.Player1;
         StartTurn(nextTeam);
     }
 
@@ -120,6 +129,90 @@ public class Main_Map : MonoBehaviour
     }
 
     /// <summary>
+    /// 指定座標から各マスまで、移動コストいくつで行けるかを計算します
+    /// </summary>
+    /// <returns>The move amount to cells.</returns>
+    /// <param name="from">From.</param>
+    public List<CoordinateAndValue> GetMoveCostToAllCells(Main_Cell from)
+    {
+        var infos = new List<CoordinateAndValue>();
+        infos.Add(new CoordinateAndValue(from.X, from.Y, 0));
+        var i = 0;
+        while (true)
+        {
+            var appendInfos = new List<CoordinateAndValue>();
+            foreach (var calcTargetInfo in infos.Where(info => info.value == i))
+            {
+                // 四方のマスの座標配列を作成
+                var calcTargetCoordinate = calcTargetInfo.coordinate;
+                var aroundCellCoordinates = new Coordinate[]
+                {
+                    new Coordinate(calcTargetCoordinate.x - 1, calcTargetCoordinate.y),
+                    new Coordinate(calcTargetCoordinate.x + 1, calcTargetCoordinate.y),
+                    new Coordinate(calcTargetCoordinate.x, calcTargetCoordinate.y - 1),
+                    new Coordinate(calcTargetCoordinate.x, calcTargetCoordinate.y + 1),
+                };
+                // 四方のマスの残移動力を計算
+                foreach (var aroundCellCoordinate in aroundCellCoordinates)
+                {
+                    var targetCell = cells.FirstOrDefault(c => c.X == aroundCellCoordinate.x && c.Y == aroundCellCoordinate.y);
+                    if (null == targetCell ||
+                        infos.Any(info => info.coordinate.x == aroundCellCoordinate.x && info.coordinate.y == aroundCellCoordinate.y) ||
+                        appendInfos.Any(info => info.coordinate.x == aroundCellCoordinate.x && info.coordinate.y == aroundCellCoordinate.y))
+                    {
+                        // マップに存在しない、または既に計算済みの座標はスルー
+                        continue;
+                    }
+                    var remainingMoveAmount = i + targetCell.Cost;
+                    appendInfos.Add(new CoordinateAndValue(aroundCellCoordinate.x, aroundCellCoordinate.y, remainingMoveAmount));
+                }
+            }
+            infos.AddRange(appendInfos);
+
+            i++;
+            if (i > infos.Max(x => x.value < 999 ? x.value : 0))
+            {
+                break;
+            }
+        }
+        return infos.Where(x => x.value < 999).ToList();
+    }
+
+    /// <summary>
+    /// 指定位置までの移動ルートと移動コストを返します
+    /// </summary>
+    /// <returns>The route coordinates and move amount.</returns>
+    /// <param name="from">From.</param>
+    /// <param name="to">To.</param>
+    public List<CoordinateAndValue> CalcurateRouteCoordinatesAndMoveAmount(Main_Cell from, Main_Cell to)
+    {
+        var costs = GetMoveCostToAllCells(from);
+        Debug.Log(LitJson.JsonMapper.ToJson(costs));
+        if (!costs.Any(info => info.coordinate.x == to.X && info.coordinate.y == to.Y))
+        {
+            throw new ArgumentException(string.Format("x:{0}, y:{1} is not movable.", to.X, to.Y));
+        }
+
+        var toCost = costs.First(info => info.coordinate.x == to.X && info.coordinate.y == to.Y);
+        var route = new List<CoordinateAndValue>();
+        route.Add(toCost);
+        while (true)
+        {
+            var currentCost = route.Last();
+            var currentCell = cells.First(cell => cell.X == currentCost.coordinate.x && cell.Y == currentCost.coordinate.y);
+            var prevMoveCost = currentCost.value - currentCell.Cost;
+            var previousCost = costs.FirstOrDefault(info => (Mathf.Abs(info.coordinate.x - currentCell.X) + Mathf.Abs(info.coordinate.y - currentCell.Y)) == 1 && info.value == prevMoveCost);
+            if (null == previousCost)
+            {
+                break;
+            }
+            route.Add(previousCost);
+        }
+        route.Reverse();
+        return route.ToList();
+    }
+
+    /// <summary>
     /// 任意のマスを取得します
     /// </summary>
     /// <returns>The cell.</returns>
@@ -128,6 +221,15 @@ public class Main_Map : MonoBehaviour
     public Main_Cell GetCell(int x, int y)
     {
         return cells.First(c => c.X == x && c.Y == y);
+    }
+
+    public Main_Cell[] GetCellsByDistance(Main_Cell baseCell, int distanceMin, int distanceMax)
+    {
+        return cells.Where(x =>
+            {
+                var distance = Math.Abs(baseCell.X - x.X) + Math.Abs(baseCell.Y - x.Y);
+                return distanceMin <= distance && distance <= distanceMax;
+            }).ToArray();
     }
 
     /// <summary>
@@ -158,18 +260,17 @@ public class Main_Map : MonoBehaviour
     public bool HighlightAttackableCells(int x, int y, int attackRangeMin, int attackRangeMax)
     {
         var startCell = cells.First(c => c.X == x && c.Y == y);
-        var targetInfos = GetRemainingAccountRangeInfos(startCell, attackRangeMin, attackRangeMax).Where(i =>
-            {
-                var cell = cells.First(c => i.coordinate.x == c.X && i.coordinate.y == c.Y);
-                return null != cell.Unit && cell.Unit.team != FocusingUnit.team;
-            });
-        foreach (var info in targetInfos)
+        var hasTarget = false;
+        foreach (var cell in GetCellsByDistance(startCell, attackRangeMin, attackRangeMax))
         {
-            var cell = cells.First(c => c.X == info.coordinate.x && c.Y == info.coordinate.y);
-            cell.IsAttackable = true;
-            cell.Unit.GetComponent<Button>().interactable = true;
+            if (null != cell.Unit && cell.Unit.team != currentTeam)
+            {
+                hasTarget = true;
+                cell.IsAttackable = true;
+                cell.Unit.GetComponent<Button>().interactable = true;
+            }
         }
-        return targetInfos.Count() > 0;
+        return hasTarget;
     }
 
     /// <summary>
@@ -209,8 +310,8 @@ public class Main_Map : MonoBehaviour
         {
             var currentCellInfo = infos.First(info => info.coordinate.x == routeCells[routeCells.Count - 1].X && info.coordinate.y == routeCells[routeCells.Count - 1].Y);
             var currentCell = cells.First(cell => cell.X == currentCellInfo.coordinate.x && cell.Y == currentCellInfo.coordinate.y);
-            var previousMoveAmount = currentCellInfo.amount + currentCell.Cost;
-            var previousCellInfo = infos.FirstOrDefault(info => (Mathf.Abs(info.coordinate.x - currentCell.X) + Mathf.Abs(info.coordinate.y - currentCell.Y)) == 1 && info.amount == previousMoveAmount);
+            var previousMoveAmount = currentCellInfo.value + currentCell.Cost;
+            var previousCellInfo = infos.FirstOrDefault(info => (Mathf.Abs(info.coordinate.x - currentCell.X) + Mathf.Abs(info.coordinate.y - currentCell.Y)) == 1 && info.value == previousMoveAmount);
             if (null == previousCellInfo)
             {
                 break;
@@ -233,7 +334,7 @@ public class Main_Map : MonoBehaviour
         unit.team = team;
         switch (unit.team)
         {
-            case Main_Unit.Teams.Enemy:
+            case Main_Unit.Teams.Player2:
                 // 敵ユニットはちょっと色を変えて反転
                 var image = unit.GetComponent<Image>();
                 image.color = new Color(1f, 0.7f, 0.7f);
@@ -274,8 +375,7 @@ public class Main_Map : MonoBehaviour
                 var isAttackable = HighlightAttackableCells(unit.x, unit.y, unit.attackRangeMin, unit.attackRangeMax);
                 if (!isAttackable)
                 {
-                    unit.GetComponent<Button>().enabled = true;
-                    unit.GetComponent<Button>().interactable = false;
+                    unit.IsMoved = true;
                     unit.IsFocusing = false;
                 }
             });
@@ -292,14 +392,26 @@ public class Main_Map : MonoBehaviour
         Battle_SceneController.defender = toUnit;
         SceneManager.LoadScene("Battle", LoadSceneMode.Additive);
         ClearHighlight();
-        FocusingUnit.GetComponent<Button>().enabled = true;
-        FocusingUnit.GetComponent<Button>().interactable = false;
+        FocusingUnit.IsMoved = true;
         FocusingUnit.IsFocusing = false;
     }
 
-    public Main_Unit[] GetMovableUnits()
+    /// <summary>
+    /// 自軍のユニットを取得します
+    /// </summary>
+    /// <returns>The own units.</returns>
+    public Main_Unit[] GetOwnUnits()
     {
-        return unitContainer.GetComponentsInChildren<Main_Unit>().ToArray();
+        return unitContainer.GetComponentsInChildren<Main_Unit>().Where(x => x.team == currentTeam).ToArray();
+    }
+
+    /// <summary>
+    /// 敵軍のユニットを取得します
+    /// </summary>
+    /// <returns>The enemy units.</returns>
+    public Main_Unit[] GetEnemyUnits()
+    {
+        return unitContainer.GetComponentsInChildren<Main_Unit>().Where(x => x.team != currentTeam).ToArray();
     }
 
     /// <summary>
@@ -319,14 +431,14 @@ public class Main_Map : MonoBehaviour
     /// <returns>The remaining move amount infos.</returns>
     /// <param name="startCell">Start cell.</param>
     /// <param name="moveAmount">Move amount.</param>
-    CoordinateAmountInfo[] GetRemainingMoveAmountInfos(Main_Cell startCell, int moveAmount)
+    CoordinateAndValue[] GetRemainingMoveAmountInfos(Main_Cell startCell, int moveAmount)
     {
-        var infos = new List<CoordinateAmountInfo>();
-        infos.Add(new CoordinateAmountInfo(startCell.X, startCell.Y, moveAmount));
+        var infos = new List<CoordinateAndValue>();
+        infos.Add(new CoordinateAndValue(startCell.X, startCell.Y, moveAmount));
         for (var i = moveAmount; i >= 0; i--)
         {
-            var appendInfos = new List<CoordinateAmountInfo>();
-            foreach (var calcTargetInfo in infos.Where(info => info.amount == i))
+            var appendInfos = new List<CoordinateAndValue>();
+            foreach (var calcTargetInfo in infos.Where(info => info.value == i))
             {
                 // 四方のマスの座標配列を作成
                 var calcTargetCoordinate = calcTargetInfo.coordinate;
@@ -349,13 +461,13 @@ public class Main_Map : MonoBehaviour
                         continue;
                     }
                     var remainingMoveAmount = i - targetCell.Cost;
-                    appendInfos.Add(new CoordinateAmountInfo(aroundCellCoordinate.x, aroundCellCoordinate.y, remainingMoveAmount));
+                    appendInfos.Add(new CoordinateAndValue(aroundCellCoordinate.x, aroundCellCoordinate.y, remainingMoveAmount));
                 }
             }
             infos.AddRange(appendInfos);
         }
         // 残移動力が0以上（移動可能）なマスの情報だけを返す
-        return infos.Where(x => x.amount >= 0).ToArray();
+        return infos.Where(x => x.value >= 0).ToArray();
     }
 
     /// <summary>
@@ -364,14 +476,14 @@ public class Main_Map : MonoBehaviour
     /// <returns>The remaining move amount infos.</returns>
     /// <param name="startCell">Start cell.</param>
     /// <param name="moveAmount">Move amount.</param>
-    CoordinateAmountInfo[] GetRemainingAccountRangeInfos(Main_Cell startCell, int attackRangeMin, int attackRangeMax)
+    CoordinateAndValue[] GetRemainingAccountRangeInfos(Main_Cell startCell, int attackRangeMin, int attackRangeMax)
     {
-        var infos = new List<CoordinateAmountInfo>();
-        infos.Add(new CoordinateAmountInfo(startCell.X, startCell.Y, attackRangeMax));
+        var infos = new List<CoordinateAndValue>();
+        infos.Add(new CoordinateAndValue(startCell.X, startCell.Y, attackRangeMax));
         for (var i = attackRangeMax; i >= 0; i--)
         {
-            var appendInfos = new List<CoordinateAmountInfo>();
-            foreach (var calcTargetInfo in infos.Where(info => info.amount == i))
+            var appendInfos = new List<CoordinateAndValue>();
+            foreach (var calcTargetInfo in infos.Where(info => info.value == i))
             {
                 // 四方のマスの座標配列を作成
                 var calcTargetCoordinate = calcTargetInfo.coordinate;
@@ -394,34 +506,34 @@ public class Main_Map : MonoBehaviour
                         continue;
                     }
                     var remainingMoveAmount = i - 1;
-                    appendInfos.Add(new CoordinateAmountInfo(aroundCellCoordinate.x, aroundCellCoordinate.y, remainingMoveAmount));
+                    appendInfos.Add(new CoordinateAndValue(aroundCellCoordinate.x, aroundCellCoordinate.y, remainingMoveAmount));
                 }
             }
             infos.AddRange(appendInfos);
         }
         // 攻撃範囲内のマスの情報だけを返す
-        return infos.Where(x => 0 <= x.amount && x.amount <= (attackRangeMax - attackRangeMin)).ToArray();
+        return infos.Where(x => 0 <= x.value && x.value <= (attackRangeMax - attackRangeMin)).ToArray();
     }
 
     /// <summary>
-    /// 対象座標での残○○力情報クラス
+    /// 座標と数値情報を紐付けるためのクラス
     /// </summary>
-    class CoordinateAmountInfo
+    public class CoordinateAndValue
     {
         public readonly Coordinate coordinate;
-        public readonly int amount;
+        public readonly int value;
 
-        public CoordinateAmountInfo(int x, int y, int amount)
+        public CoordinateAndValue(int x, int y, int value)
         {
             this.coordinate = new Coordinate(x, y);
-            this.amount = amount;
+            this.value = value;
         }
     }
 
     /// <summary>
     /// 座標クラス
     /// </summary>
-    class Coordinate
+    public class Coordinate
     {
         public readonly int x;
         public readonly int y;

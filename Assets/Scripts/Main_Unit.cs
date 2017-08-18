@@ -9,8 +9,8 @@ public class Main_Unit : MonoBehaviour
 {
     public enum Teams
     {
-        Player,
-        Enemy
+        Player1,
+        Player2
     }
 
     public enum UnitTypes
@@ -37,6 +37,7 @@ public class Main_Unit : MonoBehaviour
 
     int life;
     bool isFocusing = false;
+    bool isMoved = false;
 
     public int LifeMax { get { return lifeMax; } }
 
@@ -45,6 +46,16 @@ public class Main_Unit : MonoBehaviour
     public int AttackPower { get { return Mathf.RoundToInt(attackPowerBase * (Mathf.Ceil((float)life / (float)lifeMax * 10f) / 10f)); } }
 
     public bool IsFocusing { get { return isFocusing; } set { isFocusing = value; } }
+
+    public bool IsMoved
+    {
+        get { return isMoved; } 
+        set
+        { 
+            isMoved = value;
+            GetComponent<Button>().interactable = !isMoved;
+        }
+    }
 
     public Main_Cell Cell { get { return map.GetCell(x, y); } }
 
